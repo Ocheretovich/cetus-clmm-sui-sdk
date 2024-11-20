@@ -343,6 +343,7 @@ export class PoolModule implements IModule {
   }
 
   /**
+   * @deprecated
    * Creates a transaction payload for creating multiple pools.
    * @param {CreatePoolParams[]} paramss The parameters for the pools.
    * @returns {Promise<Transaction>} A promise that resolves to the transaction payload.
@@ -476,6 +477,7 @@ export class PoolModule implements IModule {
   }
 
   /**
+   * @deprecated
    * Create pool internal.
    * @param {CreatePoolParams[]}params The parameters for the pools.
    * @returns {Promise<Transaction>} A promise that resolves to the transaction payload.
