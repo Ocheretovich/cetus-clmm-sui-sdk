@@ -5,10 +5,10 @@ import { d } from '../src/utils/numbers'
 import { ClmmPoolUtil } from '../src/math/clmm'
 import 'isomorphic-fetch'
 import { printTransaction } from '../src/utils/transaction-util'
-import { asIntN, asUintN, isSortedSymbols } from '../src'
+import { asIntN, asUintN, initCetusSDK, isSortedSymbols } from '../src'
 
 describe('Pool Module', () => {
-  const sdk = buildSdk(SdkEnv.testnet)
+  const sdk = initCetusSDK({ network: 'mainnet' })
 
   test('getAllPools', async () => {
     const pools = await sdk.Pool.getPoolsWithPage([])
@@ -26,7 +26,7 @@ describe('Pool Module', () => {
   })
 
   test('getSiginlePool', async () => {
-    const pool = await sdk.Pool.getPool('0xc41621d02d5ee00a7a993b912a8550df50524c9b2494339691e5896936ff269b')
+    const pool = await sdk.Pool.getPool('0xcf994611fd4c48e277ce3ffd4d4364c914af2c3cbb05f7bf6facd371de688630')
     console.log('pool', pool)
   })
 
@@ -150,7 +150,7 @@ describe('Pool Module', () => {
   test('creatPoolTransactionPayload', async () => {
     sdk.senderAddress = buildTestAccount().getPublicKey().toSuiAddress()
 
-    const payload = await sdk.Pool.creatPoolTransactionPayload({
+    const payload = await sdk.Pool.createPoolTransactionPayload({
       tick_spacing: 200,
       initialize_sqrt_price: '184467440737095516',
       uri: '',

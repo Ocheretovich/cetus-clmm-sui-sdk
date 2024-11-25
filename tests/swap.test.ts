@@ -21,17 +21,18 @@ describe('Swap calculate Module', () => {
 
   test('fetchTicksByContract', async () => {
     const tickdatas = await sdk.Pool.fetchTicks({
-      pool_id: "0x0fea99ed9c65068638963a81587c3b8cafb71dc38c545319f008f7e9feb2b5f8",
-      coinTypeA: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-      coinTypeB: '0x2053d08c1e2bd02791056171aab0fd12bd7cd7efad2ab8f6b9c8902f14df2ff2::ausd::AUSD',
+      pool_id: "0xcf994611fd4c48e277ce3ffd4d4364c914af2c3cbb05f7bf6facd371de688630",
+      coinTypeA: '0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN',
+      coinTypeB: '0x2::sui::SUI',
     })
     console.log('fetchTicks: ', tickdatas)
   })
 
   test('fetchTicksByRpc', async () => {
-    const tickdatas = await sdk.Pool.fetchTicksByRpc('0x8d8e94b68fdc82f1034509cfac53061e528560ae7c156484eb7cf529419d10ff')
-    console.log('fetchTicks: ', tickdatas)
+    const tickdatas = await sdk.Pool.fetchTicksByRpc('0x0a46b7e6de173f9e48b56ec7bd3300c6a55c6fd4cabd3e2fbe7181014a796e40')
+    console.log('fetchTicks length: ', tickdatas.length)
   })
+
   test('getTickDataByIndex', async () => {
     const tickdata = await sdk.Pool.getTickDataByIndex('0x79696ca8bcdc45b9e15ef7da074a9c9a6f94739021590d7f57a3ed4055b93532', -443636)
     console.log('tickdata: ', tickdata)

@@ -1,5 +1,5 @@
 import { getFullnodeUrl } from '@mysten/sui/client'
-import CetusClmmSDK, { SdkOptions } from 'src/main'
+import CetusClmmSDK, { SdkOptions } from '../main'
 
 const SDKConfig = {
   clmmConfig: {

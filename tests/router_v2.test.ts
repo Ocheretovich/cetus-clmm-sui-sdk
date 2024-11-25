@@ -1,6 +1,6 @@
 import CetusClmmSDK, { CoinAsset, CoinAssist, TransactionUtil } from '../src'
 import { AggregatorResult, CoinProvider, PathProvider } from '../src/modules'
-import { SdkEnv, TestnetCoin, buildSdk, buildTestAccount } from './data/init_test_data'
+import { MainnetCoin, SdkEnv, TestnetCoin, buildSdk, buildTestAccount } from './data/init_test_data'
 import { assert } from 'console'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 import { Secp256k1Keypair } from '@mysten/sui/keypairs/secp256k1'
@@ -8,7 +8,7 @@ import { Transaction } from '@mysten/sui/transactions'
 import { verifyBalanceEnough } from './router_v1.test'
 
 describe('Test Router V2 Module', () => {
-  const sdk = buildSdk(SdkEnv.testnet)
+  const sdk = buildSdk(SdkEnv.mainnet)
   const sendKeypair = buildTestAccount()
   sdk.senderAddress = sendKeypair.getPublicKey().toSuiAddress()
 
@@ -24,7 +24,7 @@ describe('Test Router V2 Module', () => {
     const poolsInfo = await resp.json()
 
     if (poolsInfo.code === 200) {
-      for (const pool of poolsInfo.data.lp_list) {
+      for (const pool of poolsInfo.data.pools) {
         if (pool.is_closed) {
           continue
         }
@@ -54,6 +54,9 @@ describe('Test Router V2 Module', () => {
         }
       }
     }
+
+    console.log("poolMap.size: ", poolMap.size)
+    console.log("coinMap.size: ", coinMap.size)
 
     const coins: CoinProvider = {
       coins: Array.from(coinMap.values()),
@@ -193,11 +196,11 @@ describe('Test Router V2 Module', () => {
   })
 
   test('Test specific router swap', async () => {
-    const coin_a = TestnetCoin.SUI
-    const coin_b = TestnetCoin.HASUI
-    const amount = 8143301107
-    const byAmountIn = true
-    const slippage = 0
+    const coin_a = MainnetCoin.NAVX
+    const coin_b = MainnetCoin.USDC
+    const amount = 8358442
+    const byAmountIn = false
+    const slippage = 5
 
     const { result, version } = await (await sdk.RouterV2.getBestRouter(coin_a, coin_b, amount, byAmountIn, slippage, '', undefined, undefined, false, true))
     console.log(result, version)

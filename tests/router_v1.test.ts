@@ -26,7 +26,7 @@ describe('Test Router V1 Module', () => {
     const poolsInfo = await resp.json()
 
     if (poolsInfo.code === 200) {
-      for (const pool of poolsInfo.data.lp_list) {
+      for (const pool of poolsInfo.data.pools) {
         if (pool.is_closed) {
           continue
         }

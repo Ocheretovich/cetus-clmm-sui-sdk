@@ -316,7 +316,7 @@ export class PoolModule implements IModule {
     } catch (e) {
       throw new ClmmpoolsError(`Failed tp [arse response from ${url}].`, RouterErrorCode.InvalidSwapCountUrl)
     }
-    const pools = json.data.lp_list
+    const pools = json.data.pools
     if (!pools || pools.length === 0) {
       throw new ClmmpoolsError(`Failed tp [arse response from ${url}].`, PoolErrorCode.PoolsNotFound)
     }
@@ -718,13 +718,13 @@ export class PoolModule implements IModule {
 
   /**
    * Fetches ticks from the fullnode using the RPC API.
-   * @param {string} tickHandle The handle for the tick.
+   * @param {string} tickHandle The handle for the tick. Get tick handle from `sdk.Pool.getPool()`
    * @returns {Promise<TickData[]>} A promise that resolves to an array of tick data.
    */
   async fetchTicksByRpc(tickHandle: string): Promise<TickData[]> {
     let allTickData: TickData[] = []
     let nextCursor: string | null = null
-    const limit = 512
+    const limit = 50
     while (true) {
       const allTickId: SuiObjectIdType[] = []
       const idRes: DynamicFieldPage = await this.sdk.fullClient.getDynamicFields({
@@ -732,7 +732,6 @@ export class PoolModule implements IModule {
         cursor: nextCursor,
         limit,
       })
-
       nextCursor = idRes.nextCursor
       idRes.data.forEach((item) => {
         if (extractStructTagFromType(item.objectType).module === 'skip_list') {
@@ -742,7 +741,7 @@ export class PoolModule implements IModule {
 
       allTickData = [...allTickData, ...(await this.getTicksByRpc(allTickId))]
 
-      if (nextCursor === null || idRes.data.length < limit) {
+      if (!idRes.hasNextPage) {
         break
       }
     }
