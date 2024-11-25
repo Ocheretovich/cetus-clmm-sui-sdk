@@ -162,15 +162,17 @@ describe('Pool Module', () => {
       slippage: 0.005,
       metadata_a: '0x7bf5b2682d4f6936370006037e8026bdf62798cdcc59e2453ee0093121952099',
       metadata_b: '0x052cf0a5bb81f890c36dc773cc260c565f6fa2fa58882863cb3aa7a357990dbf',
+      tick_lower: -440000,
+      tick_upper: 440000,
     })
-    const  cPrice = TickMath.sqrtPriceX64ToPrice(new BN('184467440737095516'),9,6)
+    const cPrice = TickMath.sqrtPriceX64ToPrice(new BN('184467440737095516'), 9, 6)
     console.log('🚀🚀🚀 ~ file: pool.test.ts:168 ~ test ~ cPrice:', cPrice.toString())
     printTransaction(payload)
     // const transferTxn = await sdk.fullClient.devInspectTransactionBlock({
     //   transactionBlock: payload,
     //   sender: buildTestAccount().getPublicKey().toSuiAddress(),
     // })
-       const transferTxn = await sdk.fullClient.sendTransaction(buildTestAccount(), payload)
+    const transferTxn = await sdk.fullClient.sendTransaction(buildTestAccount(), payload)
     console.log('doCreatPool: ', transferTxn)
     console.log('🚀🚀🚀 ~ file: pool.test.ts:168 ~ test ~ transferTxn:', transferTxn)
   })

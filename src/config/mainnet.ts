@@ -1,5 +1,5 @@
 import { getFullnodeUrl } from '@mysten/sui/client'
-import CetusClmmSDK, { SdkOptions } from '@cetusprotocol/cetus-sui-clmm-sdk'
+import CetusClmmSDK, { SdkOptions } from 'src/main'
 
 const SDKConfig = {
   clmmConfig: {
@@ -33,12 +33,12 @@ export const clmmMainnet: SdkOptions = {
   },
   clmm_pool: {
     package_id: '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb',
-    published_at: '0x157468379cfe5616c063ae39a889dd184ad48350d3e08f8d9b4ade22b8e3fb61',
+    published_at: '0xdc67d6de3f00051c505da10d8f6fbab3b3ec21ec65f0dc22a2f36c13fc102110',
     config: SDKConfig.clmmConfig,
   },
   integrate: {
     package_id: '0x996c4d9480708fb8b92aa7acf819fb0497b5ec8e65ba06601cae2fb6db3312c3',
-    published_at: '0x15c0555d7601d98ca2659a8387d377a81b1e285ee0808484e101f96d05806187',
+    published_at: '0x3a5aa90ffa33d09100d7b6941ea1c0ffe6ab66e77062ddd26320c1b073aabb10',
   },
   deepbook: {
     package_id: '0x000000000000000000000000000000000000000000000000000000000000dee9',

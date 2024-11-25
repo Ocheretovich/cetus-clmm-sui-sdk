@@ -29,7 +29,7 @@ describe('Position add Liquidity Module', () => {
   })
 
   test('get ower position list', async () => {
-    const res = await sdk.Position.getPositionList(buildTestAccount().getPublicKey().toSuiAddress(), [PoolObjectID])
+    const res = await sdk.Position.getPositionList("0xa40aead2dd007e5d16ce7282f2826c259c8fe5a0a5b163585787981f9edd2a72", [])
     console.log('getPositionList####', res)
   })
 

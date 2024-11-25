@@ -21,15 +21,15 @@ describe('Swap calculate Module', () => {
 
   test('fetchTicksByContract', async () => {
     const tickdatas = await sdk.Pool.fetchTicks({
-      pool_id: "0x2e041f3fd93646dcc877f783c1f2b7fa62d30271bdef1f21ef002cebf857bded",
-      coinTypeA: MainnetCoin.CETUS,
-      coinTypeB: MainnetCoin.SUI,
+      pool_id: "0x0fea99ed9c65068638963a81587c3b8cafb71dc38c545319f008f7e9feb2b5f8",
+      coinTypeA: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+      coinTypeB: '0x2053d08c1e2bd02791056171aab0fd12bd7cd7efad2ab8f6b9c8902f14df2ff2::ausd::AUSD',
     })
     console.log('fetchTicks: ', tickdatas)
   })
 
   test('fetchTicksByRpc', async () => {
-    const tickdatas = await sdk.Pool.fetchTicksByRpc('0x8d2ed466497914180b59fb3ad2cf036ac62f59c3761646caba51dfa92ca9c97a')
+    const tickdatas = await sdk.Pool.fetchTicksByRpc('0x8d8e94b68fdc82f1034509cfac53061e528560ae7c156484eb7cf529419d10ff')
     console.log('fetchTicks: ', tickdatas)
   })
   test('getTickDataByIndex', async () => {
@@ -79,7 +79,7 @@ describe('Swap calculate Module', () => {
 
   test('preswap', async () => {
     const a2b = false
-    const pool = await sdk.Pool.getPool('0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105')
+    const pool = await sdk.Pool.getPool('0x0fea99ed9c65068638963a81587c3b8cafb71dc38c545319f008f7e9feb2b5f8')
     const byAmountIn = false
     const amount = '800000'
 
@@ -150,7 +150,7 @@ describe('Swap Module', () => {
     const amount = '10000000'
     const slippage = Percentage.fromDecimal(d(0.1))
 
-    const currentPool = await buildTestPool(sdk, USDT_USDC_POOL_10)
+    const currentPool = await buildTestPool(sdk, "")
     console.log('currentPool: ', currentPool)
 
     const decimalsA = 6

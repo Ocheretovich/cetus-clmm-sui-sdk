@@ -452,12 +452,12 @@ export type CreatePoolAddLiquidityParams = CreatePoolParams & {
   /**
    * The lower tick index for liquidity provision.
    */
-  // tick_lower: number
+  tick_lower: number
 
   /**
    * The upper tick index for liquidity provision.
    */
-  // tick_upper: number
+  tick_upper: number
 
   metadata_a: SuiObjectIdType
   metadata_b: SuiObjectIdType

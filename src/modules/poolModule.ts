@@ -361,6 +361,7 @@ export class PoolModule implements IModule {
   }
 
   /**
+   * @deprecated rename to createPoolTransactionPayload
    * Create a pool of clmmpool protocol. The pool is identified by (CoinTypeA, CoinTypeB, tick_spacing).
    * @param {CreatePoolParams | CreatePoolAddLiquidityParams} params
    * @returns {Promise<Transaction>}
@@ -375,7 +376,24 @@ export class PoolModule implements IModule {
       params.metadata_b = params.metadata_a
       params.metadata_a = metadataB
     }
-    return await this.creatPoolAndAddLiquidity(params)
+    return await this.createPoolAndAddLiquidity(params)
+  }
+
+  /**
+   * Create a pool of clmmpool protocol. The pool is identified by (CoinTypeA, CoinTypeB, tick_spacing).
+   * @param {CreatePoolParams | CreatePoolAddLiquidityParams} params
+   * @returns {Promise<Transaction>}
+   */
+  async createPoolTransactionPayload(params: CreatePoolAddLiquidityParams): Promise<Transaction> {
+    if (isSortedSymbols(normalizeSuiAddress(params.coinTypeA), normalizeSuiAddress(params.coinTypeB))) {
+      const swpaCoinTypeB = params.coinTypeB
+      params.coinTypeB = params.coinTypeA
+      params.coinTypeA = swpaCoinTypeB
+      const metadataB = params.metadata_b
+      params.metadata_b = params.metadata_a
+      params.metadata_a = metadataB
+    }
+    return await this.createPoolAndAddLiquidity(params)
   }
 
   /**
@@ -514,7 +532,7 @@ export class PoolModule implements IModule {
    * @param {CreatePoolAddLiquidityParams}params The parameters for the create and liquidity.
    * @returns {Promise<Transaction>} A promise that resolves to the transaction payload.
    */
-  private async creatPoolAndAddLiquidity(params: CreatePoolAddLiquidityParams): Promise<Transaction> {
+  private async createPoolAndAddLiquidity(params: CreatePoolAddLiquidityParams): Promise<Transaction> {
     if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
       throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
     }
@@ -534,6 +552,8 @@ export class PoolModule implements IModule {
       tx.pure.u32(params.tick_spacing),
       tx.pure.u128(params.initialize_sqrt_price),
       tx.pure.string(params.uri),
+      tx.pure.u32(Number(asUintN(BigInt(params.tick_lower)).toString())),
+      tx.pure.u32(Number(asUintN(BigInt(params.tick_upper)).toString())),
       primaryCoinAInputsR.targetCoin,
       primaryCoinBInputsR.targetCoin,
       tx.object(params.metadata_a),
@@ -542,7 +562,7 @@ export class PoolModule implements IModule {
       tx.object(CLOCK_ADDRESS),
     ]
     tx.moveCall({
-      target: `${integrate.published_at}::pool_creator::create_pool_v2`,
+      target: `${integrate.published_at}::pool_creator_v2::create_pool_v2`,
       typeArguments: [params.coinTypeA, params.coinTypeB],
       arguments: args,
     })
