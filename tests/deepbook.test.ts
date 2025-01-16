@@ -5,7 +5,6 @@ import SDK, { CoinAsset, CoinAssist, DeepbookUtils, Pool, printTransaction, Swap
 import { ClmmFetcherModule, ClmmIntegratePoolModule, CLOCK_ADDRESS } from '../src/types/sui'
 import { TransactionArgument, Transaction } from '@mysten/sui/transactions'
 
-
 describe('Router Module', () => {
   const sdk = buildSdk()
   const sendKeypair = buildTestAccount()
@@ -44,7 +43,9 @@ describe('Router Module', () => {
   })
 
   test('test get all order of pools', async () => {
-    const pools = await (await DeepbookUtils.getPools(sdk)).filter((p) => p.poolID === '0xeb91fb7e1050fd6aa209d529a3f6bd8149a62f2f447f6abbe805a921983eb76c')
+    const pools = await (
+      await DeepbookUtils.getPools(sdk)
+    ).filter((p) => p.poolID === '0xeb91fb7e1050fd6aa209d529a3f6bd8149a62f2f447f6abbe805a921983eb76c')
 
     for (const pool of pools) {
       console.log('--------------------------------')

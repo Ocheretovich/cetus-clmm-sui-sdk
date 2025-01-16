@@ -1,12 +1,12 @@
-import { buildSdk } from './data/init_test_data'
+import { buildSdk, SdkEnv } from './data/init_test_data'
 import 'isomorphic-fetch'
 
 describe('Config Module', () => {
-  const sdk = buildSdk()
+  const sdk = buildSdk(SdkEnv.testnet)
 
   test('getTokenListByCoinTypes', async () => {
     const tokenMap = await sdk.CetusConfig.getTokenListByCoinTypes([
-      '0x49d9b80dfe534058cf2c4cfa43d5ac8cb4b4af6aef562befcd545de493c2013a::idob::IDOB',
+      '0x2::sui::SUI',
     ])
     console.log('tokenMap: ', tokenMap)
   })

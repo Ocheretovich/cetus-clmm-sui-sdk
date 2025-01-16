@@ -241,7 +241,8 @@ export class TransactionUtil {
           params.slippage,
           params.coinTypeA,
           allCoins,
-          false
+          false,
+          true
         )
         primaryCoinBInputs = TransactionUtil.buildAddLiquidityFixTokenCoinInput(
           newTx,
@@ -250,7 +251,8 @@ export class TransactionUtil {
           params.slippage,
           params.coinTypeB,
           allCoins,
-          false
+          false,
+          true
         )
       } else {
         params.amount_b = Number(fixAmount)
@@ -261,7 +263,8 @@ export class TransactionUtil {
           params.slippage,
           params.coinTypeA,
           allCoins,
-          false
+          false,
+          true
         )
         primaryCoinBInputs = TransactionUtil.buildAddLiquidityFixTokenCoinInput(
           newTx,
@@ -270,7 +273,8 @@ export class TransactionUtil {
           params.slippage,
           params.coinTypeB,
           allCoins,
-          false
+          false,
+          true
         )
         params = TransactionUtil.fixAddLiquidityFixTokenParams(params, gasEstimateArg.slippage, gasEstimateArg.curSqrtPrice)
 
@@ -311,7 +315,8 @@ export class TransactionUtil {
         params.slippage,
         params.coinTypeA,
         allCoinAsset,
-        false
+        false,
+        true
       )
       primaryCoinBInputs = TransactionUtil.buildAddLiquidityFixTokenCoinInput(
         tx,
@@ -320,7 +325,8 @@ export class TransactionUtil {
         params.slippage,
         params.coinTypeB,
         allCoinAsset,
-        false
+        false,
+        true
       )
     } else {
       primaryCoinAInputs = {
@@ -355,7 +361,8 @@ export class TransactionUtil {
     slippage: number,
     coinType: string,
     allCoinAsset: CoinAsset[],
-    buildVector = true
+    buildVector = true,
+    fixAmount = true
   ): BuildCoinResult {
     return need_interval_amount
       ? TransactionUtil.buildCoinForAmountInterval(
@@ -363,9 +370,10 @@ export class TransactionUtil {
           allCoinAsset,
           { amountSecond: BigInt(reverSlippageAmount(amount, slippage)), amountFirst: BigInt(amount) },
           coinType,
-          buildVector
+          buildVector,
+          fixAmount
         )
-      : TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(amount), coinType, buildVector)
+      : TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(amount), coinType, buildVector, fixAmount)
   }
 
   /**
@@ -841,14 +849,15 @@ export class TransactionUtil {
     tx: Transaction,
     amount: bigint,
     coinType: string,
-    buildVector = true
+    buildVector = true,
+    fixAmount = true
   ): Promise<TransactionObjectArgument | undefined> {
     if (sdk.senderAddress.length === 0) {
       throw Error('this config sdk senderAddress is empty')
     }
 
     const allCoins = await sdk.getOwnerCoinAssets(sdk.senderAddress, coinType)
-    const primaryCoinInput: any = TransactionUtil.buildCoinForAmount(tx, allCoins, amount, coinType, buildVector)!.targetCoin
+    const primaryCoinInput: any = TransactionUtil.buildCoinForAmount(tx, allCoins, amount, coinType, buildVector, fixAmount)!.targetCoin
 
     return primaryCoinInput
   }
@@ -859,10 +868,11 @@ export class TransactionUtil {
     amount: bigint,
     coinType: string,
     buildVector = true,
-    fixAmount = false
+    fixAmount = true
   ): BuildCoinResult {
     const coinAssets: CoinAsset[] = CoinAssist.getCoinAssets(coinType, allCoins)
-    if (amount === BigInt(0) && coinAssets.length === 0) {
+    // mint zero coin
+    if (amount === BigInt(0)) {
       return TransactionUtil.buildZeroValueCoin(allCoins, tx, coinType, buildVector)
     }
     const amountTotal = CoinAssist.calculateTotalBalance(coinAssets)
@@ -876,26 +886,52 @@ export class TransactionUtil {
     return TransactionUtil.buildCoin(tx, allCoins, coinAssets, amount, coinType, buildVector, fixAmount)
   }
 
-  private static buildCoin(
+  private static buildVectorCoin(
     tx: Transaction,
     allCoins: CoinAsset[],
     coinAssets: CoinAsset[],
     amount: bigint,
     coinType: string,
-    buildVector = true,
-    fixAmount = false
-  ): BuildCoinResult {
+    fixAmount = true
+  ) {
     if (CoinAssist.isSuiCoin(coinType)) {
-      if (buildVector) {
-        const amountCoin = tx.splitCoins(tx.gas, [tx.pure.u64(amount)])
-        return {
-          targetCoin: tx.makeMoveVec({ elements: [amountCoin] }),
-          remainCoins: allCoins,
-          tragetCoinAmount: amount.toString(),
-          isMintZeroCoin: false,
-          originalSplitedCoin: tx.gas,
-        }
+      const amountCoin = tx.splitCoins(tx.gas, [tx.pure.u64(amount)])
+      return {
+        targetCoin: tx.makeMoveVec({ elements: [amountCoin] }),
+        remainCoins: allCoins,
+        tragetCoinAmount: amount.toString(),
+        isMintZeroCoin: false,
+        originalSplitedCoin: tx.gas,
       }
+    }
+
+    const { targetCoin, originalSplitedCoin, tragetCoinAmount, selectedCoinsResult, coinObjectIds } = this.buildSpitTargeCoin(
+      tx,
+      amount,
+      coinAssets,
+      fixAmount
+    )
+
+    if (fixAmount) {
+      return {
+        targetCoin: tx.makeMoveVec({ elements: [targetCoin] }),
+        remainCoins: selectedCoinsResult.remainCoins,
+        originalSplitedCoin,
+        tragetCoinAmount,
+        isMintZeroCoin: false,
+      }
+    }
+
+    return {
+      targetCoin: tx.makeMoveVec({ elements: coinObjectIds.map((id) => tx.object(id)) }),
+      remainCoins: selectedCoinsResult.remainCoins,
+      tragetCoinAmount: selectedCoinsResult.amountArray.reduce((a, b) => Number(a) + Number(b), 0).toString(),
+      isMintZeroCoin: false,
+    }
+  }
+
+  private static buildOneCoin(tx: Transaction, coinAssets: CoinAsset[], amount: bigint, coinType: string, fixAmount = true) {
+    if (CoinAssist.isSuiCoin(coinType)) {
       if (amount === 0n && coinAssets.length > 1) {
         const selectedCoinsResult = CoinAssist.selectCoinObjectIdGreaterThanOrEqual(coinAssets, amount)
         return {
@@ -916,17 +952,27 @@ export class TransactionUtil {
       }
     }
 
+    const { targetCoin, originalSplitedCoin, tragetCoinAmount, selectedCoinsResult } = this.buildSpitTargeCoin(
+      tx,
+      amount,
+      coinAssets,
+      fixAmount
+    )
+
+    return {
+      targetCoin,
+      remainCoins: selectedCoinsResult.remainCoins,
+      originalSplitedCoin,
+      tragetCoinAmount,
+      isMintZeroCoin: false,
+    }
+  }
+
+  private static buildSpitTargeCoin(tx: Transaction, amount: bigint, coinAssets: CoinAsset[], fixAmount: boolean) {
     const selectedCoinsResult = CoinAssist.selectCoinObjectIdGreaterThanOrEqual(coinAssets, amount)
     const totalSelectedCoinAmount = selectedCoinsResult.amountArray.reduce((a, b) => Number(a) + Number(b), 0).toString()
     const coinObjectIds = selectedCoinsResult.objectArray
-    if (buildVector) {
-      return {
-        targetCoin: tx.makeMoveVec({ elements: coinObjectIds.map((id) => tx.object(id)) }),
-        remainCoins: selectedCoinsResult.remainCoins,
-        tragetCoinAmount: selectedCoinsResult.amountArray.reduce((a, b) => Number(a) + Number(b), 0).toString(),
-        isMintZeroCoin: false,
-      }
-    }
+
     const [primaryCoinA, ...mergeCoinAs] = coinObjectIds
     const primaryCoinAObject = tx.object(primaryCoinA)
 
@@ -946,12 +992,28 @@ export class TransactionUtil {
     }
 
     return {
-      targetCoin,
-      remainCoins: selectedCoinsResult.remainCoins,
       originalSplitedCoin,
+      targetCoin,
       tragetCoinAmount,
-      isMintZeroCoin: false,
+      selectedCoinsResult,
+      coinObjectIds,
     }
+  }
+
+  private static buildCoin(
+    tx: Transaction,
+    allCoins: CoinAsset[],
+    coinAssets: CoinAsset[],
+    amount: bigint,
+    coinType: string,
+    buildVector = true,
+    fixAmount = true
+  ): BuildCoinResult {
+    if (buildVector) {
+      return this.buildVectorCoin(tx, allCoins, coinAssets, amount, coinType, fixAmount)
+    }
+
+    return this.buildOneCoin(tx, coinAssets, amount, coinType, fixAmount)
   }
 
   private static buildZeroValueCoin(allCoins: CoinAsset[], tx: Transaction, coinType: string, buildVector = true): BuildCoinResult {
@@ -976,12 +1038,13 @@ export class TransactionUtil {
     allCoins: CoinAsset[],
     amounts: CoinInputInterval,
     coinType: string,
-    buildVector = true
+    buildVector = true,
+    fixAmount = true
   ): BuildCoinResult {
     const coinAssets: CoinAsset[] = CoinAssist.getCoinAssets(coinType, allCoins)
     if (amounts.amountFirst === BigInt(0)) {
       if (coinAssets.length > 0) {
-        return TransactionUtil.buildCoin(tx, [...allCoins], [...coinAssets], amounts.amountFirst, coinType, buildVector)
+        return TransactionUtil.buildCoin(tx, [...allCoins], [...coinAssets], amounts.amountFirst, coinType, buildVector, fixAmount)
       }
       return TransactionUtil.buildZeroValueCoin(allCoins, tx, coinType, buildVector)
     }
@@ -989,7 +1052,7 @@ export class TransactionUtil {
     const amountTotal = CoinAssist.calculateTotalBalance(coinAssets)
 
     if (amountTotal >= amounts.amountFirst) {
-      return TransactionUtil.buildCoin(tx, [...allCoins], [...coinAssets], amounts.amountFirst, coinType, buildVector)
+      return TransactionUtil.buildCoin(tx, [...allCoins], [...coinAssets], amounts.amountFirst, coinType, buildVector, fixAmount)
     }
 
     if (amountTotal < amounts.amountSecond) {
@@ -999,7 +1062,7 @@ export class TransactionUtil {
       )
     }
 
-    return TransactionUtil.buildCoin(tx, [...allCoins], [...coinAssets], amounts.amountSecond, coinType, buildVector)
+    return TransactionUtil.buildCoin(tx, [...allCoins], [...coinAssets], amounts.amountSecond, coinType, buildVector, fixAmount)
   }
 
   static callMintZeroValueCoin = (txb: Transaction, coinType: string) => {

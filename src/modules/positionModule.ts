@@ -407,8 +407,8 @@ export class PositionModule implements IModule {
     let primaryCoinBInputs: BuildCoinResult
     if (inputCoinA == null || inputCoinB == null) {
       const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
-      primaryCoinAInputs = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, max_amount_a, params.coinTypeA, false)
-      primaryCoinBInputs = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, max_amount_b, params.coinTypeB, false)
+      primaryCoinAInputs = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, max_amount_a, params.coinTypeA, false, true)
+      primaryCoinBInputs = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, max_amount_b, params.coinTypeB, false, true)
     } else {
       primaryCoinAInputs = {
         targetCoin: inputCoinA,

@@ -79,6 +79,11 @@ export type SdkOptions = {
    * The URL for the swap count
    */
   swapCountUrl?: string
+
+  /**
+   * The URL for the swap count
+   */
+  statsPoolsUrl?: string
 }
 
 /**

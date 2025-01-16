@@ -308,7 +308,19 @@ export class PoolModule implements IModule {
       return []
     }
 
-    const url = this._sdk.sdkOptions.swapCountUrl!
+    // 0x2::sui::SUI -> 0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI
+    for (let i = 0; i < coins.length; i++) {
+      if (coins[i] === '0x2::sui::SUI') {
+        coins[i] = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI'
+      }
+    }
+
+    let url = this._sdk.sdkOptions.statsPoolsUrl!
+    if (!url) {
+      throw new ClmmpoolsError(`statsPoolsUrl is not set in the sdk options.`, PoolErrorCode.StatsPoolsUrlNotSet)
+    }
+    url += `?order_by=-fees&limit=100&has_mining=true&has_farming=true&no_incentives=true&display_all_pools=true&coin_type=${coins.join(',')}`
+
     const response = await fetch(url)
     let json
     try {
@@ -316,7 +328,7 @@ export class PoolModule implements IModule {
     } catch (e) {
       throw new ClmmpoolsError(`Failed tp [arse response from ${url}].`, RouterErrorCode.InvalidSwapCountUrl)
     }
-    const pools = json.data.pools
+    const pools = json.data.lp_list
     if (!pools || pools.length === 0) {
       throw new ClmmpoolsError(`Failed tp [arse response from ${url}].`, PoolErrorCode.PoolsNotFound)
     }

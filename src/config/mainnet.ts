@@ -50,6 +50,7 @@ export const clmmMainnet: SdkOptions = {
   },
   aggregatorUrl: 'https://api-sui.cetus.zone/router',
   swapCountUrl: 'https://api-sui.cetus.zone/v2/sui/swap/count',
+  statsPoolsUrl: 'https://api-sui.cetus.zone/v2/sui/stats_pools',
 }
 
 /**

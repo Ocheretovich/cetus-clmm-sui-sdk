@@ -1,9 +1,9 @@
+import 'isomorphic-fetch'
 import BN from 'bn.js'
-import { SdkEnv, TestnetCoin, buildSdk, buildTestAccount } from './data/init_test_data'
+import { TestnetCoin, buildTestAccount } from './data/init_test_data'
 import { TickMath } from '../src/math/tick'
 import { d } from '../src/utils/numbers'
 import { ClmmPoolUtil } from '../src/math/clmm'
-import 'isomorphic-fetch'
 import { printTransaction } from '../src/utils/transaction-util'
 import { asIntN, asUintN, initCetusSDK, isSortedSymbols } from '../src'
 
@@ -120,7 +120,18 @@ describe('Pool Module', () => {
     const coinB = '0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN'
 
     const pools = await sdk.Pool.getPoolByCoins([coinA, coinB])
-    console.log('find pools by cointypes', pools)
+    expect(pools.length).toBeGreaterThan(0);
+
+    const coinC = '0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN'
+    const coinD = '0x2::sui::SUI'
+
+    const pools2 = await sdk.Pool.getPoolByCoins([coinC, coinD])
+    expect(pools2.length).toBeGreaterThan(0);
+
+    const coinE = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI'
+
+    const pools3 = await sdk.Pool.getPoolByCoins([coinC, coinE])
+    expect(pools3.length).toEqual(pools2.length)
   })
 
   test('ClmmPoolUtil.estLiquidityAndcoinAmountFromOneAmounts: ', () => {

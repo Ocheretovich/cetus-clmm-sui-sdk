@@ -124,6 +124,9 @@ function _pairSymbol(
   }
 }
 
+/**
+ * @deprecated Replace this feature with the latest aggregator sdk: https://github.com/CetusProtocol/aggregator
+ */
 export class RouterModule implements IModule {
   readonly graph: Graph
 
@@ -307,6 +310,8 @@ export class RouterModule implements IModule {
   }
 
   /**
+   * @deprecated Replace this feature with the latest aggregator sdk: https://github.com/CetusProtocol/aggregator
+   * 
    * Get the best price from router graph.
    *
    * @param {string} from from coin type

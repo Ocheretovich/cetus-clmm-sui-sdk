@@ -53,6 +53,7 @@ export const clmmTestnet: SdkOptions = {
   },
   aggregatorUrl: 'https://api-sui.devcetus.com/router',
   swapCountUrl: 'https://api-sui.devcetus.com/v2/sui/swap/count',
+  statsPoolsUrl: 'https://api-sui.devcetus.com/v2/sui/stats_pools',
 }
 
 /**
