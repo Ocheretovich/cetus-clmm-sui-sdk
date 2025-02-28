@@ -1,23 +1,24 @@
-import CetusClmmSDK from "../main"
-import { initMainnetSDK } from "./mainnet"
-import { initTestnetSDK } from "./testnet"
+import CetusClmmSDK from '../main'
+import { initMainnetSDK } from './mainnet'
+import { initTestnetSDK } from './testnet'
 
 interface InitCetusSDKOptions {
-  network: 'mainnet' | 'testnet';
-  fullNodeUrl?: string;
-  simulationAccount?: string;
+  network: 'mainnet' | 'testnet'
+  fullNodeUrl?: string
+  wallet?: string
 }
 
 /**
  * Helper function to initialize the Cetus SDK
  * @param env - The environment to initialize the SDK in. One of 'mainnet' or 'testnet'.
  * @param fullNodeUrl - The full node URL to use.
- * @param simulationAccount - The simulation account address to use. If not provided, 
- *                            the default simulation account `0x0000000000000000000000000000000000000000000000000000000000000000` will be used.
- *                            If you use the `preswap` method, you should set a simulation account and ensure that this address has sufficient input coins.
+ * @param wallet - The wallet address to use. If not provided,
+ *                 If you use the `preswap` method or other methods that require payment assistance,
+ *                  you must configure a wallet with sufficient balance of input tokens.
+ *                  If you do not set a wallet, the SDK will throw an error.
  * @returns The initialized Cetus SDK.
  */
 export function initCetusSDK(options: InitCetusSDKOptions): CetusClmmSDK {
-  const { network, fullNodeUrl, simulationAccount } = options;
-  return network === 'mainnet' ? initMainnetSDK(fullNodeUrl, simulationAccount) : initTestnetSDK(fullNodeUrl, simulationAccount)
+  const { network, fullNodeUrl, wallet } = options
+  return network === 'mainnet' ? initMainnetSDK(fullNodeUrl, wallet) : initTestnetSDK(fullNodeUrl, wallet)
 }

@@ -1,5 +1,6 @@
 import { getFullnodeUrl } from '@mysten/sui/client'
 import CetusClmmSDK, { SdkOptions } from '../main'
+import { checkInvalidSuiAddress } from '../utils'
 
 const SDKConfig = {
   clmmConfig: {
@@ -62,12 +63,13 @@ export const clmmTestnet: SdkOptions = {
  * @param simulationAccount. If provided, it will be used as the simulation account address.
  * @returns
  */
-export function initTestnetSDK(fullNodeUrl?: string, simulationAccount?: string): CetusClmmSDK {
+export function initTestnetSDK(fullNodeUrl?: string, wallet?: string): CetusClmmSDK {
   if (fullNodeUrl) {
     clmmTestnet.fullRpcUrl = fullNodeUrl
   }
-  if (simulationAccount) {
-    clmmTestnet.simulationAccount.address = simulationAccount
+  const sdk = new CetusClmmSDK(clmmTestnet)
+  if (wallet && checkInvalidSuiAddress(wallet)) {
+    sdk.senderAddress = wallet
   }
-  return new CetusClmmSDK(clmmTestnet)
+  return sdk
 }

@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { Transaction, TransactionArgument, TransactionObjectArgument } from '@mysten/sui/transactions'
+import { Transaction, TransactionObjectArgument } from '@mysten/sui/transactions'
 import { isValidSuiObjectId } from '@mysten/sui/utils'
 import {
   AddLiquidityFixTokenParams,
@@ -9,6 +9,7 @@ import {
   OpenPositionParams,
   Position,
   PositionReward,
+  PositionTransactionInfo,
   RemoveLiquidityParams,
   getPackagerConfigs,
 } from '../types'
@@ -17,6 +18,7 @@ import {
   asUintN,
   buildPosition,
   buildPositionReward,
+  buildPositionTransactionInfo,
   cacheTime24h,
   cacheTime5min,
   checkInvalidSuiAddress,
@@ -30,6 +32,8 @@ import {
   ClmmIntegratePoolV2Module,
   ClmmIntegratePoolV3Module,
   CLOCK_ADDRESS,
+  DataPage,
+  PaginationArgs,
   SuiObjectIdType,
   SuiResource,
 } from '../types/sui'
@@ -39,6 +43,7 @@ import { getObjectFields } from '../utils/objects'
 import { CollectFeesQuote } from '../math'
 import { FetchPosFeeParams } from './rewarderModule'
 import { ClmmpoolsError, ConfigErrorCode, PoolErrorCode, UtilsErrorCode } from '../errors/errors'
+import { RpcModule } from './rpcModule'
 
 /**
  * Helper class to help interact with clmm position with a position router interface.
@@ -63,6 +68,53 @@ export class PositionModule implements IModule {
   buildPositionType() {
     const cetusClmm = this._sdk.sdkOptions.clmm_pool.package_id
     return `${cetusClmm}::position::Position`
+  }
+
+  async getPositionTransactionList({
+    posId,
+    paginationArgs = 'all',
+    order = 'ascending',
+    fullRpcUrl,
+    originPosId,
+  }: {
+    posId: string
+    originPosId?: string
+    fullRpcUrl?: string
+    paginationArgs?: PaginationArgs
+    order?: 'ascending' | 'descending' | null | undefined
+  }): Promise<DataPage<PositionTransactionInfo>> {
+    const { fullClient } = this._sdk
+    const filterIds: string[] = [posId]
+    if (originPosId) {
+      filterIds.push(originPosId)
+    }
+    let client
+    if (fullRpcUrl) {
+      client = new RpcModule({
+        url: fullRpcUrl,
+      })
+    } else {
+      client = fullClient
+    }
+    const data: DataPage<PositionTransactionInfo> = {
+      data: [],
+      hasNextPage: false,
+    }
+    try {
+      const res = await client.queryTransactionBlocksByPage({ ChangedObject: posId }, paginationArgs, order)
+
+      res.data.forEach((item, index) => {
+        const dataList = buildPositionTransactionInfo(item, index, filterIds)
+        data.data = [...data.data, ...dataList]
+      })
+      data.hasNextPage = res.hasNextPage
+      data.nextCursor = res.nextCursor
+      return data
+    } catch (error) {
+      console.log('Error in getPositionTransactionList:', error)
+    }
+
+    return data
   }
 
   /**
@@ -351,10 +403,13 @@ export class PositionModule implements IModule {
     inputCoinA?: TransactionObjectArgument,
     inputCoinB?: TransactionObjectArgument
   ): Promise<Transaction> {
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this.sdk.senderAddress)
 
     if (gasEstimateArg) {
       const { isAdjustCoinA, isAdjustCoinB } = findAdjustCoin(params)
@@ -388,8 +443,11 @@ export class PositionModule implements IModule {
     inputCoinB?: TransactionObjectArgument
   ): Promise<Transaction> {
     const { integrate, clmm_pool } = this._sdk.sdkOptions
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
 
     const tick_lower = asUintN(BigInt(params.tick_lower)).toString()
@@ -406,7 +464,7 @@ export class PositionModule implements IModule {
     let primaryCoinAInputs: BuildCoinResult
     let primaryCoinBInputs: BuildCoinResult
     if (inputCoinA == null || inputCoinB == null) {
-      const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+      const allCoinAsset = await this.sdk.getOwnerCoinAssets(this.sdk.senderAddress)
       primaryCoinAInputs = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, max_amount_a, params.coinTypeA, false, true)
       primaryCoinBInputs = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, max_amount_b, params.coinTypeB, false, true)
     } else {
@@ -442,9 +500,9 @@ export class PositionModule implements IModule {
         ],
       })
     } else {
-      const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+      const allCoinAsset = await this.sdk.getOwnerCoinAssets(this.sdk.senderAddress)
       tx = TransactionUtil.createCollectRewarderAndFeeParams(
-        this._sdk,
+        this.sdk,
         tx,
         params,
         allCoinAsset,
@@ -476,10 +534,12 @@ export class PositionModule implements IModule {
    * @returns {TransactionBlock}
    */
   async removeLiquidityTransactionPayload(params: RemoveLiquidityParams, tx?: Transaction): Promise<Transaction> {
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-
     const { clmm_pool, integrate } = this.sdk.sdkOptions
 
     const functionName = 'remove_liquidity'
@@ -488,7 +548,7 @@ export class PositionModule implements IModule {
 
     const typeArguments = [params.coinTypeA, params.coinTypeB]
 
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this.sdk.senderAddress)
 
     tx = TransactionUtil.createCollectRewarderAndFeeParams(this._sdk, tx, params, allCoinAsset)
 
@@ -517,17 +577,19 @@ export class PositionModule implements IModule {
    * @returns {TransactionBlock}
    */
   async closePositionTransactionPayload(params: ClosePositionParams, tx?: Transaction): Promise<Transaction> {
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-
     const { clmm_pool, integrate } = this.sdk.sdkOptions
 
     tx = tx || new Transaction()
 
     const typeArguments = [params.coinTypeA, params.coinTypeB]
 
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+    const allCoinAsset = await this.sdk.getOwnerCoinAssets(this.sdk.senderAddress)
 
     tx = TransactionUtil.createCollectRewarderAndFeeParams(this._sdk, tx, params, allCoinAsset)
 
@@ -587,18 +649,17 @@ export class PositionModule implements IModule {
     inputCoinA?: TransactionObjectArgument,
     inputCoinB?: TransactionObjectArgument
   ): Promise<Transaction> {
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
 
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress, null, true)
     tx = tx || new Transaction()
 
-    const primaryCoinAInput = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(0), params.coinTypeA, false)
-    const primaryCoinBInput = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(0), params.coinTypeB, false)
-
-    const coinA = inputCoinA ?? primaryCoinAInput.targetCoin
-    const coinB = inputCoinB ?? primaryCoinBInput.targetCoin
+    const coinA = inputCoinA || TransactionUtil.buildCoinWithBalance(BigInt(0), params.coinTypeA)
+    const coinB = inputCoinB || TransactionUtil.buildCoinWithBalance(BigInt(0), params.coinTypeB)
 
     this.createCollectFeePaylod(params, tx, coinA, coinB)
     return tx
@@ -659,14 +720,17 @@ export class PositionModule implements IModule {
    */
   async calculateFee(params: CollectFeeParams) {
     const paylod = await this.collectFeeTransactionPayload(params)
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-
     const res = await this._sdk.fullClient.devInspectTransactionBlock({
       transactionBlock: paylod,
-      sender: this._sdk.senderAddress,
+      sender: this.sdk.senderAddress,
     })
+
     for (const event of res.events) {
       if (extractStructTagFromType(event.type).name === 'CollectFeeEvent') {
         const json = event.parsedJson as any

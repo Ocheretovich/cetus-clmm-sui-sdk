@@ -1,6 +1,6 @@
 import { DynamicFieldPage, SuiObjectResponse, SuiTransactionBlockResponse } from '@mysten/sui/client'
 import { normalizeSuiAddress } from '@mysten/sui/utils'
-import { Transaction } from '@mysten/sui/transactions'
+import { Transaction, TransactionObjectArgument } from '@mysten/sui/transactions'
 import { CachedContent, cacheTime24h, cacheTime5min, checkInvalidSuiAddress, getFutureTime } from '../utils'
 import {
   CreatePoolAddLiquidityParams,
@@ -13,10 +13,11 @@ import {
   PositionReward,
   getPackagerConfigs,
   CoinAsset,
+  PoolTransactionInfo,
 } from '../types'
 import { TransactionUtil } from '../utils/transaction-util'
 import { tickScore } from '../math'
-import { asUintN, buildPool, buildPositionReward, buildTickData, buildTickDataByEvent } from '../utils/common'
+import { asUintN, buildPool, buildPoolTransactionInfo, buildPositionReward, buildTickData, buildTickDataByEvent } from '../utils/common'
 import { extractStructTagFromType, isSortedSymbols } from '../utils/contracts'
 import { TickData } from '../types/clmmpool'
 import {
@@ -25,6 +26,7 @@ import {
   ClmmPartnerModule,
   CLOCK_ADDRESS,
   DataPage,
+  PageQuery,
   PaginationArgs,
   SuiObjectIdType,
   SuiResource,
@@ -41,11 +43,21 @@ import {
   RouterErrorCode,
   UtilsErrorCode,
 } from '../errors/errors'
+import { RpcModule } from './rpcModule'
 
 type GetTickParams = {
   start: number[]
   limit: number
 } & FetchParams
+
+export type CreatePoolAndAddLiquidityRowResult = {
+  position: TransactionObjectArgument
+  coinAObject: TransactionObjectArgument
+  coinBObject: TransactionObjectArgument
+  transaction: Transaction
+  coinAType: string
+  coinBType: string
+}
 
 /**
  * Helper class to help interact with clmm pools with a pool router interface.
@@ -319,7 +331,9 @@ export class PoolModule implements IModule {
     if (!url) {
       throw new ClmmpoolsError(`statsPoolsUrl is not set in the sdk options.`, PoolErrorCode.StatsPoolsUrlNotSet)
     }
-    url += `?order_by=-fees&limit=100&has_mining=true&has_farming=true&no_incentives=true&display_all_pools=true&coin_type=${coins.join(',')}`
+    url += `?order_by=-fees&limit=100&has_mining=true&has_farming=true&no_incentives=true&display_all_pools=true&coin_type=${coins.join(
+      ','
+    )}`
 
     const response = await fetch(url)
     let json
@@ -379,6 +393,9 @@ export class PoolModule implements IModule {
    * @returns {Promise<Transaction>}
    */
   async creatPoolTransactionPayload(params: CreatePoolAddLiquidityParams): Promise<Transaction> {
+    // If the coin types are not sorted, swap them and swap the metadata.
+    // You can refer to the documentation for the specific sorting rules. ## How to determine coinTypeA and coinTypeB ?
+    // https://cetus-1.gitbook.io/cetus-developer-docs/developer/via-sdk/features-available/create-clmm-pool
     if (isSortedSymbols(normalizeSuiAddress(params.coinTypeA), normalizeSuiAddress(params.coinTypeB))) {
       const swpaCoinTypeB = params.coinTypeB
       params.coinTypeB = params.coinTypeA
@@ -406,6 +423,27 @@ export class PoolModule implements IModule {
       params.metadata_a = metadataB
     }
     return await this.createPoolAndAddLiquidity(params)
+  }
+
+  /**
+   * Create pool and add liquidity row. It will call `pool_creator_v2::create_pool_v2` function.
+   * This method will return the position, coin_a, coin_b. User can use these to build own transaction.
+   * @param {CreatePoolAddLiquidityParams}params The parameters for the create and liquidity.
+   * @returns {Promise<CreatePoolAndAddLiquidityRowResult>} A promise that resolves to the transaction payload.
+   */
+  async createPoolTransactionRowPayload(params: CreatePoolAddLiquidityParams): Promise<CreatePoolAndAddLiquidityRowResult> {
+    // If the coin types are not sorted, swap them and swap the metadata.
+    // You can refer to the documentation for the specific sorting rules. ## How to determine coinTypeA and coinTypeB ?
+    // https://cetus-1.gitbook.io/cetus-developer-docs/developer/via-sdk/features-available/create-clmm-pool
+    if (isSortedSymbols(normalizeSuiAddress(params.coinTypeA), normalizeSuiAddress(params.coinTypeB))) {
+      const swpaCoinTypeB = params.coinTypeB
+      params.coinTypeB = params.coinTypeA
+      params.coinTypeA = swpaCoinTypeB
+      const metadataB = params.metadata_b
+      params.metadata_b = params.metadata_a
+      params.metadata_a = metadataB
+    }
+    return await this.createPoolAndAddLiquidityRow(params)
   }
 
   /**
@@ -506,6 +544,54 @@ export class PoolModule implements IModule {
     return objects
   }
 
+  async getPoolTransactionList({
+    poolId,
+    paginationArgs,
+    order = 'descending',
+    fullRpcUrl,
+  }: {
+    poolId: string
+    fullRpcUrl?: string
+    paginationArgs: PageQuery
+    order?: 'ascending' | 'descending' | null | undefined
+  }): Promise<DataPage<PoolTransactionInfo>> {
+    const { fullClient, sdkOptions } = this._sdk
+    let client
+    if (fullRpcUrl) {
+      client = new RpcModule({
+        url: fullRpcUrl,
+      })
+    } else {
+      client = fullClient
+    }
+    const data: DataPage<PoolTransactionInfo> = {
+      data: [],
+      hasNextPage: false,
+    }
+
+    const limit = 50
+    const query = paginationArgs
+    const userLimit = paginationArgs.limit || 10
+    do {
+      const res = await client.queryTransactionBlocksByPage({ ChangedObject: poolId }, { ...query, limit: 50 }, order)
+      res.data.forEach((item, index) => {
+        data.nextCursor = res.nextCursor
+        const dataList = buildPoolTransactionInfo(item, index, sdkOptions.clmm_pool.package_id, poolId)
+        data.data = [...data.data, ...dataList]
+      })
+      data.hasNextPage = res.hasNextPage
+      data.nextCursor = res.nextCursor
+      query.cursor = res.nextCursor
+    } while (data.data.length < userLimit && data.hasNextPage)
+
+    if (data.data.length > userLimit) {
+      data.data = data.data.slice(0, userLimit)
+      data.nextCursor = data.data[data.data.length - 1].tx
+    }
+
+    return data
+  }
+
   /**
    * @deprecated
    * Create pool internal.
@@ -540,21 +626,27 @@ export class PoolModule implements IModule {
   }
 
   /**
-   * Create pool and add liquidity internal. It will call create_pool_with_liquidity function.
+   * Create pool and add liquidity internal. It will call `pool_creator_v2::create_pool_v2` function in cetus integrate contract.
+   * It encapsulates the original create_pool_v2 method from the Cetus CLMM and processes the additional outputs for position and coin within a single move call.
    * @param {CreatePoolAddLiquidityParams}params The parameters for the create and liquidity.
    * @returns {Promise<Transaction>} A promise that resolves to the transaction payload.
    */
   private async createPoolAndAddLiquidity(params: CreatePoolAddLiquidityParams): Promise<Transaction> {
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
 
     const tx = new Transaction()
+    tx.setSender(this.sdk.senderAddress)
     const { integrate, clmm_pool } = this.sdk.sdkOptions
     const eventConfig = getPackagerConfigs(clmm_pool)
     const globalPauseStatusObjectId = eventConfig.global_config_id
     const poolsId = eventConfig.pools_id
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+
+    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this.sdk.senderAddress)
     const primaryCoinAInputsR = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(params.amount_a), params.coinTypeA, false, true)
     const primaryCoinBInputsR = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(params.amount_b), params.coinTypeB, false, true)
 
@@ -578,11 +670,64 @@ export class PoolModule implements IModule {
       typeArguments: [params.coinTypeA, params.coinTypeB],
       arguments: args,
     })
-
     TransactionUtil.buildTransferCoinToSender(this._sdk, tx, primaryCoinAInputsR.targetCoin, params.coinTypeA)
     TransactionUtil.buildTransferCoinToSender(this._sdk, tx, primaryCoinBInputsR.targetCoin, params.coinTypeB)
 
     return tx
+  }
+
+  /**
+   * Create pool and add liquidity row. It will call `pool_creator_v2::create_pool_v2` function.
+   * This method will return the position, coin_a, coin_b. User can use these to build own transaction.
+   * @param {CreatePoolAddLiquidityParams}params The parameters for the create and liquidity.
+   * @returns {Promise<Transaction>} A promise that resolves to the transaction payload.
+   */
+  private async createPoolAndAddLiquidityRow(params: CreatePoolAddLiquidityParams): Promise<CreatePoolAndAddLiquidityRowResult> {
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
+    }
+
+    const tx = new Transaction()
+    const { clmm_pool } = this.sdk.sdkOptions
+    const eventConfig = getPackagerConfigs(clmm_pool)
+    const globalPauseStatusObjectId = eventConfig.global_config_id
+    const poolsId = eventConfig.pools_id
+    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this.sdk.senderAddress)
+    const primaryCoinAInputsR = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(params.amount_a), params.coinTypeA, false, true)
+    const primaryCoinBInputsR = TransactionUtil.buildCoinForAmount(tx, allCoinAsset, BigInt(params.amount_b), params.coinTypeB, false, true)
+
+    const args = [
+      tx.object(globalPauseStatusObjectId),
+      tx.object(poolsId),
+      tx.pure.u32(params.tick_spacing),
+      tx.pure.u128(params.initialize_sqrt_price),
+      tx.pure.string(params.uri),
+      tx.pure.u32(Number(asUintN(BigInt(params.tick_lower)).toString())),
+      tx.pure.u32(Number(asUintN(BigInt(params.tick_upper)).toString())),
+      primaryCoinAInputsR.targetCoin,
+      primaryCoinBInputsR.targetCoin,
+      tx.object(params.metadata_a),
+      tx.object(params.metadata_b),
+      tx.pure.bool(params.fix_amount_a),
+      tx.object(CLOCK_ADDRESS),
+    ]
+    const res: TransactionObjectArgument[] = tx.moveCall({
+      target: `${clmm_pool.published_at}::pool_creator::create_pool_v2`,
+      typeArguments: [params.coinTypeA, params.coinTypeB],
+      arguments: args,
+    })
+
+    return {
+      transaction: tx,
+      position: res[0],
+      coinAObject: res[1],
+      coinBObject: res[2],
+      coinAType: params.coinTypeA,
+      coinBType: params.coinTypeB,
+    }
   }
 
   /**
@@ -638,7 +783,10 @@ export class PoolModule implements IModule {
     })
 
     if (!checkInvalidSuiAddress(simulationAccount.address)) {
-      throw new ClmmpoolsError('this config simulationAccount is not set right', ConfigErrorCode.InvalidSimulateAccount)
+      throw new ClmmpoolsError(
+        'Invalid simulation account: Configuration requires a valid Sui address. Please check your SDK configuration.',
+        ConfigErrorCode.InvalidSimulateAccount
+      )
     }
 
     const simulateRes = await this.sdk.fullClient.devInspectTransactionBlock({

@@ -1,5 +1,6 @@
 import { getFullnodeUrl } from '@mysten/sui/client'
 import CetusClmmSDK, { SdkOptions } from '../main'
+import { checkInvalidSuiAddress } from '../utils'
 
 const SDKConfig = {
   clmmConfig: {
@@ -22,7 +23,7 @@ const SDKConfig = {
 
 // mainnet
 export const clmmMainnet: SdkOptions = {
-  fullRpcUrl: getFullnodeUrl('mainnet'),
+  fullRpcUrl: 'https://mainnet.suiet.app:443',
   simulationAccount: {
     address: '0x0000000000000000000000000000000000000000000000000000000000000000',
   },
@@ -33,12 +34,12 @@ export const clmmMainnet: SdkOptions = {
   },
   clmm_pool: {
     package_id: '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb',
-    published_at: '0xdc67d6de3f00051c505da10d8f6fbab3b3ec21ec65f0dc22a2f36c13fc102110',
+    published_at: '0xc6faf3703b0e8ba9ed06b7851134bbbe7565eb35ff823fd78432baa4cbeaa12e',
     config: SDKConfig.clmmConfig,
   },
   integrate: {
     package_id: '0x996c4d9480708fb8b92aa7acf819fb0497b5ec8e65ba06601cae2fb6db3312c3',
-    published_at: '0x3a5aa90ffa33d09100d7b6941ea1c0ffe6ab66e77062ddd26320c1b073aabb10',
+    published_at: '0x2d8c2e0fc6dd25b0214b3fa747e0fd27fd54608142cd2e4f64c1cd350cc4add4',
   },
   deepbook: {
     package_id: '0x000000000000000000000000000000000000000000000000000000000000dee9',
@@ -57,17 +58,18 @@ export const clmmMainnet: SdkOptions = {
  * Initialize the mainnet SDK
  * @param fullNodeUrl. If provided, it will be used as the full node URL.
  * @param simulationAccount. If provided, it will be used as the simulation account address.
+ *                           when you use the `preswap` method or other methods that require payment assistance,
+ *                           you must configure a simulation account with sufficient balance of input tokens.
+ *                           If you connect the wallet, you can set the current wallet address to simulationAccount.
  * @returns
  */
-export function initMainnetSDK(
-  fullNodeUrl?: string,
-  simulationAccount?: string
-): CetusClmmSDK {
+export function initMainnetSDK(fullNodeUrl?: string, wallet?: string): CetusClmmSDK {
   if (fullNodeUrl) {
     clmmMainnet.fullRpcUrl = fullNodeUrl
   }
-  if (simulationAccount) {
-    clmmMainnet.simulationAccount.address = simulationAccount
+  const sdk = new CetusClmmSDK(clmmMainnet)
+  if (wallet && checkInvalidSuiAddress(wallet)) {
+    sdk.senderAddress = wallet
   }
-  return new CetusClmmSDK(clmmMainnet)
+  return sdk
 }

@@ -4,12 +4,15 @@ import {
   DynamicFieldPage,
   PaginatedEvents,
   PaginatedObjectsResponse,
+  PaginatedTransactionResponse,
+  QueryTransactionBlocksParams,
   SuiClient,
   SuiEventFilter,
   SuiObjectDataOptions,
   SuiObjectResponse,
   SuiObjectResponseQuery,
   SuiTransactionBlockResponse,
+  TransactionFilter,
 } from '@mysten/sui/client'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 import { Secp256k1Keypair } from '@mysten/sui/keypairs/secp256k1'
@@ -39,6 +42,36 @@ export class RpcModule extends SuiClient {
         query,
         cursor: nextCursor,
         limit: queryAll ? null : paginationArgs.limit,
+      })
+      if (res.data) {
+        result = [...result, ...res.data]
+        hasNextPage = res.hasNextPage
+        nextCursor = res.nextCursor
+      } else {
+        hasNextPage = false
+      }
+    } while (queryAll && hasNextPage)
+
+    return { data: result, nextCursor, hasNextPage }
+  }
+
+  async queryTransactionBlocksByPage(
+    filter?: TransactionFilter,
+    paginationArgs: PaginationArgs = 'all',
+    order: 'ascending' | 'descending' | null | undefined = 'ascending'
+  ): Promise<DataPage<SuiTransactionBlockResponse>> {
+    let result: any = []
+    let hasNextPage = true
+    const queryAll = paginationArgs === 'all'
+    let nextCursor = queryAll ? null : paginationArgs.cursor
+
+    do {
+      const res: PaginatedTransactionResponse = await this.queryTransactionBlocks({
+        filter,
+        cursor: nextCursor,
+        order,
+        limit: queryAll ? null : paginationArgs.limit,
+        options: { showEvents: true },
       })
       if (res.data) {
         result = [...result, ...res.data]

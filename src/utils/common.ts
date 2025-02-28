@@ -2,8 +2,17 @@ import BN from 'bn.js'
 import { fromB64, fromHEX } from '@mysten/bcs'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 import { Secp256k1Keypair } from '@mysten/sui/keypairs/secp256k1'
-import { SuiObjectResponse } from '@mysten/sui/client'
-import { ClmmPositionStatus, Pool, Position, PositionReward, Rewarder } from '../types'
+import { PaginatedTransactionResponse, SuiObjectResponse, SuiTransactionBlockResponse } from '@mysten/sui/client'
+import {
+  ClmmPositionStatus,
+  Pool,
+  poolFilterEvenTypes,
+  PoolTransactionInfo,
+  Position,
+  PositionReward,
+  PositionTransactionInfo,
+  Rewarder,
+} from '../types'
 import { MathUtil } from '../math'
 import { NFT } from '../types/sui'
 import { extractStructTagFromType } from './contracts'
@@ -410,4 +419,85 @@ export function buildTickDataByEvent(fields: any): TickData {
 
 export function buildClmmPositionName(pool_index: number, position_index: number): string {
   return `Cetus LP | Pool${pool_index}-${position_index}`
+}
+
+export function buildPositionTransactionInfo(data: SuiTransactionBlockResponse, txIndex: number, filterIds: string[]) {
+  const list: PositionTransactionInfo[] = []
+  const { timestampMs, events } = data
+
+  const filterEvenTypes = [
+    'AddLiquidityEvent',
+    'RemoveLiquidityEvent',
+    'CollectFeeEvent',
+    'CollectRewardEvent',
+    'CollectRewardV2Event',
+    'HarvestEvent',
+  ]
+
+  events?.forEach((event, index) => {
+    const type = extractStructTagFromType(event.type).name
+    if (filterEvenTypes.includes(type)) {
+      const info: PositionTransactionInfo = {
+        txDigest: event.id.txDigest,
+        packageId: event.packageId,
+        transactionModule: event.transactionModule,
+        sender: event.sender,
+        type: event.type,
+        timestampMs: timestampMs || '0',
+        parsedJson: event.parsedJson,
+        index: `${txIndex}_${index}`,
+      }
+
+      switch (type) {
+        case 'CollectFeeEvent':
+          if (filterIds.includes(info.parsedJson.position) && (d(info.parsedJson.amount_a).gt(0) || d(info.parsedJson.amount_b).gt(0))) {
+            list.push(info)
+          }
+          break
+        case 'RemoveLiquidityEvent':
+        case 'AddLiquidityEvent':
+          if (d(info.parsedJson.amount_a).gt(0) || d(info.parsedJson.amount_b).gt(0)) {
+            list.push(info)
+          }
+          break
+        case 'CollectRewardEvent':
+        case 'HarvestEvent':
+        case 'CollectRewardV2Event':
+          if (
+            (filterIds.includes(info.parsedJson.position) || filterIds.includes(info.parsedJson.wrapped_position_id)) &&
+            d(info.parsedJson.amount).gt(0)
+          ) {
+            list.push(info)
+          }
+          break
+
+        default:
+          break
+      }
+    }
+  })
+
+  return list
+}
+
+export function buildPoolTransactionInfo(data: SuiTransactionBlockResponse, txIndex: number, package_id: string, poolId: string) {
+  const list: PoolTransactionInfo[] = []
+  const { timestampMs, events } = data
+
+  events?.forEach((event: any, index) => {
+    const { name: type, address: packageAddress } = extractStructTagFromType(event.type)
+    if (poolFilterEvenTypes.includes(type) && packageAddress === package_id && poolId === event.parsedJson.pool) {
+      const info: PoolTransactionInfo = {
+        tx: event.id.txDigest,
+        sender: event.sender,
+        type: event.type,
+        block_time: timestampMs || '0',
+        index: `${txIndex}_${index}`,
+        parsedJson: event.parsedJson,
+      }
+      list.push(info)
+    }
+  })
+
+  return list
 }

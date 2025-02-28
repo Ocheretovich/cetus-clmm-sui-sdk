@@ -1,15 +1,25 @@
 import BN from 'bn.js'
-import { SdkEnv, TestnetCoin, buildSdk, buildTestAccountNew as buildTestAccount } from './data/init_test_data'
+import { SdkEnv, TestnetCoin, buildSdk } from './data/init_test_data'
 import { CoinProvider, SwapWithRouterParams } from '../src/modules/routerModule'
 import { CetusClmmSDK, CoinAsset, CoinAssist, TransactionUtil } from '../src'
 import { PathProvider } from '../src/modules/routerModule'
 import { execTx } from './router_v2.test'
 import { Transaction } from '@mysten/sui/transactions'
 import { assert } from 'console'
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
+import { fromB64 } from '@mysten/bcs'
 
 describe('Test Router V1 Module', () => {
   const sdk = buildSdk(SdkEnv.testnet)
-  const sendKeypair = buildTestAccount()
+  const secret = process.env.SUI_WALLET_SECRET || ''
+  const mnemonic = process.env.SUI_WALLET_MNEMONICS || ''
+  let sendKeypair: Ed25519Keypair
+
+  if (secret && secret.length > 0) {
+    sendKeypair = Ed25519Keypair.fromSecretKey(fromB64(secret).slice(1, 33))
+  } else {
+    sendKeypair = Ed25519Keypair.deriveKeypair(mnemonic)
+  }
   sdk.senderAddress = sendKeypair.getPublicKey().toSuiAddress()
 
   const coinList = Object.values(TestnetCoin)

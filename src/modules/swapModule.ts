@@ -22,7 +22,7 @@ import { computeSwap } from '../math/clmm'
 import { TickMath } from '../math/tick'
 import { checkInvalidSuiAddress, d } from '../utils'
 import { SplitPath } from './routerModuleV2'
-import { ClmmpoolsError, ConfigErrorCode, SwapErrorCode } from '../errors/errors'
+import { ClmmpoolsError, ConfigErrorCode, SwapErrorCode, UtilsErrorCode } from '../errors/errors'
 
 export const AMM_SWAP_MODULE = 'amm_swap'
 export const POOL_STRUCT = 'Pool'
@@ -115,7 +115,12 @@ export class SwapModule implements IModule {
 
     const typeArguments = [params.coinTypeA, params.coinTypeB]
     for (let i = 0; i < params.poolAddresses.length; i += 1) {
-      const args = [tx.object(params.poolAddresses[i]), tx.pure.bool(params.a2b), tx.pure.bool(params.byAmountIn), tx.pure.u64(params.amount)]
+      const args = [
+        tx.object(params.poolAddresses[i]),
+        tx.pure.bool(params.a2b),
+        tx.pure.bool(params.byAmountIn),
+        tx.pure.u64(params.amount),
+      ]
       tx.moveCall({
         target: `${integrate.published_at}::${ClmmFetcherModule}::calculate_swap_result`,
         arguments: args,
@@ -245,7 +250,7 @@ export class SwapModule implements IModule {
   private transformSwapWithMultiPoolData(params: TransPreSwapWithMultiPoolParams, jsonData: any) {
     const { data } = jsonData
 
-    console.log("json data. ", data)
+    console.log('json data. ', data)
 
     const estimatedAmountIn = data.amount_in && data.fee_amount ? new BN(data.amount_in).add(new BN(data.fee_amount)).toString() : ''
     return {
@@ -345,10 +350,13 @@ export class SwapModule implements IModule {
       currentPool: Pool
     }
   ): Promise<Transaction> {
-    if (this._sdk.senderAddress.length === 0) {
-      throw Error('this config sdk senderAddress is empty')
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this.sdk.senderAddress)
 
     if (gasEstimateArg) {
       const { isAdjustCoinA, isAdjustCoinB } = findAdjustCoin(params)
@@ -380,10 +388,13 @@ export class SwapModule implements IModule {
       currentPool: Pool
     }
   ): Promise<{ tx: Transaction; coinABs: TransactionObjectArgument[] }> {
-    if (this._sdk.senderAddress.length === 0) {
-      throw Error('this config sdk senderAddress is empty')
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress)
+    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this.sdk.senderAddress)
 
     if (gasEstimateArg) {
       const { isAdjustCoinA, isAdjustCoinB } = findAdjustCoin(params)

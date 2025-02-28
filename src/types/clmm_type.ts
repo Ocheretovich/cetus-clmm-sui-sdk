@@ -941,3 +941,25 @@ export function getPackagerConfigs<T>(packageObj: Package<T>) {
   }
   return packageObj.config
 }
+
+export type PositionTransactionInfo = {
+  index: string
+  txDigest: string
+  packageId: string
+  transactionModule: string
+  sender: string
+  type: string
+  timestampMs: string
+  parsedJson: any
+}
+
+export type PoolTransactionInfo = {
+  index: string
+  tx: string
+  sender: string
+  type: string
+  block_time: string
+  parsedJson: any
+}
+
+export const poolFilterEvenTypes = ['RemoveLiquidityEvent', 'SwapEvent', 'AddLiquidityEvent']

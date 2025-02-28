@@ -491,11 +491,13 @@ export class RewarderModule implements IModule {
    * @returns
    */
   async collectRewarderTransactionPayload(params: CollectRewarderParams): Promise<Transaction> {
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress, null)
+    const allCoinAsset = await this.sdk.getOwnerCoinAssets(this.sdk.senderAddress, null)
     let tx = new Transaction()
 
     tx = TransactionUtil.createCollectRewarderAndFeeParams(this._sdk, tx, params, allCoinAsset)
@@ -515,10 +517,13 @@ export class RewarderModule implements IModule {
     inputCoinA?: TransactionObjectArgument,
     inputCoinB?: TransactionObjectArgument
   ) {
-    if (!checkInvalidSuiAddress(this._sdk.senderAddress)) {
-      throw new ClmmpoolsError('this config sdk senderAddress is not set right', UtilsErrorCode.InvalidSendAddress)
+    if (!checkInvalidSuiAddress(this.sdk.senderAddress)) {
+      throw new ClmmpoolsError(
+        'Invalid sender address: cetus clmm sdk requires a valid sender address. Please set it using sdk.senderAddress = "0x..."',
+        UtilsErrorCode.InvalidSendAddress
+      )
     }
-    const allCoinAsset = await this._sdk.getOwnerCoinAssets(this._sdk.senderAddress, null)
+    const allCoinAsset = await this.sdk.getOwnerCoinAssets(this.sdk.senderAddress, null)
     tx = tx || new Transaction()
     const coinIdMaps: Record<string, BuildCoinResult> = {}
     params.forEach((item) => {
@@ -587,7 +592,7 @@ export class RewarderModule implements IModule {
     Object.keys(coinIdMaps).forEach((key) => {
       const value = coinIdMaps[key]
       if (value.isMintZeroCoin) {
-        TransactionUtil.buildTransferCoin(this._sdk, tx!, value.targetCoin, key, this._sdk.senderAddress)
+        TransactionUtil.buildTransferCoin(this.sdk, tx!, value.targetCoin, key, this.sdk.senderAddress)
       }
     })
 

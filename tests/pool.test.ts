@@ -5,10 +5,27 @@ import { TickMath } from '../src/math/tick'
 import { d } from '../src/utils/numbers'
 import { ClmmPoolUtil } from '../src/math/clmm'
 import { printTransaction } from '../src/utils/transaction-util'
-import { asIntN, asUintN, initCetusSDK, isSortedSymbols } from '../src'
+import { asIntN, asUintN, initCetusSDK, isSortedSymbols, TransactionUtil } from '../src'
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
+import { fromB64 } from '@mysten/bcs'
+
+import dotenv from 'dotenv'
+dotenv.config()
 
 describe('Pool Module', () => {
-  const sdk = initCetusSDK({ network: 'mainnet' })
+  const secret = process.env.SUI_WALLET_SECRET || ''
+  const mnemonic = process.env.SUI_WALLET_MNEMONICS || ''
+  let keypair: Ed25519Keypair
+
+  if (secret && secret.length > 0) {
+    keypair = Ed25519Keypair.fromSecretKey(fromB64(secret).slice(1, 33))
+  } else {
+    keypair = Ed25519Keypair.deriveKeypair(mnemonic)
+  }
+
+  const wallet = keypair.getPublicKey().toSuiAddress()
+  const sdk = initCetusSDK({ network: 'mainnet', wallet })
+  console.log('sdk.senderAddress', sdk.senderAddress)
 
   test('getAllPools', async () => {
     const pools = await sdk.Pool.getPoolsWithPage([])
@@ -18,6 +35,16 @@ describe('Pool Module', () => {
   test('getPoolImmutables', async () => {
     const poolImmutables = await sdk.Pool.getPoolImmutables()
     console.log('getPoolImmutables', poolImmutables)
+  })
+
+  test('getPoolTransactionList', async () => {
+    const res = await sdk.Pool.getPoolTransactionList({
+      poolId: '0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105',
+      paginationArgs: {
+        limit: 10,
+      },
+    })
+    console.log('res', res)
   })
 
   test('getAllPool', async () => {
@@ -120,18 +147,25 @@ describe('Pool Module', () => {
     const coinB = '0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN'
 
     const pools = await sdk.Pool.getPoolByCoins([coinA, coinB])
-    expect(pools.length).toBeGreaterThan(0);
+    expect(pools.length).toBeGreaterThan(0)
 
     const coinC = '0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN'
     const coinD = '0x2::sui::SUI'
 
     const pools2 = await sdk.Pool.getPoolByCoins([coinC, coinD])
-    expect(pools2.length).toBeGreaterThan(0);
+    expect(pools2.length).toBeGreaterThan(0)
 
     const coinE = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI'
 
     const pools3 = await sdk.Pool.getPoolByCoins([coinC, coinE])
     expect(pools3.length).toEqual(pools2.length)
+
+    const coinCetus = '0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS'
+    const coinBlub = '0xfa7ac3951fdca92c5200d468d31a365eb03b2be9936fde615e69f0c1274ad3a0::BLUB::BLUB'
+
+    const pools4 = await sdk.Pool.getPoolByCoins([coinCetus, coinBlub])
+    console.log('pools4', pools4)
+    expect(pools4.length).toEqual(pools2.length)
   })
 
   test('ClmmPoolUtil.estLiquidityAndcoinAmountFromOneAmounts: ', () => {
@@ -159,34 +193,32 @@ describe('Pool Module', () => {
   })
 
   test('creatPoolTransactionPayload', async () => {
-    sdk.senderAddress = buildTestAccount().getPublicKey().toSuiAddress()
-
     const payload = await sdk.Pool.createPoolTransactionPayload({
-      tick_spacing: 200,
-      initialize_sqrt_price: '184467440737095516',
+      tick_spacing: 220,
+      initialize_sqrt_price: '18446744073709551616',
       uri: '',
       fix_amount_a: true,
       amount_a: '100000000',
-      amount_b: '10000',
-      coinTypeA: '0x26b3bc67befc214058ca78ea9a2690298d731a2d4309485ec3d40198063c4abc::cetus::CETUS',
-      coinTypeB: '0x0588cff9a50e0eaf4cd50d337c1a36570bc1517793fd3303e1513e8ad4d2aa96::usdc::USDC',
-      slippage: 0.005,
-      metadata_a: '0x7bf5b2682d4f6936370006037e8026bdf62798cdcc59e2453ee0093121952099',
-      metadata_b: '0x052cf0a5bb81f890c36dc773cc260c565f6fa2fa58882863cb3aa7a357990dbf',
-      tick_lower: -440000,
-      tick_upper: 440000,
+      amount_b: '100000000',
+      coinTypeA: '0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d::hasui::HASUI',
+      coinTypeB: '0x2::sui::SUI',
+      slippage: 0.05,
+      metadata_a: '0x2c5f33af93f6511df699aaaa5822d823aac6ed99d4a0de2a4a50b3afa0172e24',
+      metadata_b: '0x9258181f5ceac8dbffb7030890243caed69a9599d2886d957a9cb7656af3bdb3',
+      tick_lower: -443520,
+      tick_upper: 443520,
     })
     const cPrice = TickMath.sqrtPriceX64ToPrice(new BN('184467440737095516'), 9, 6)
     console.log('🚀🚀🚀 ~ file: pool.test.ts:168 ~ test ~ cPrice:', cPrice.toString())
     printTransaction(payload)
-    // const transferTxn = await sdk.fullClient.devInspectTransactionBlock({
-    //   transactionBlock: payload,
-    //   sender: buildTestAccount().getPublicKey().toSuiAddress(),
-    // })
-    const transferTxn = await sdk.fullClient.sendTransaction(buildTestAccount(), payload)
-    console.log('doCreatPool: ', transferTxn)
+    const transferTxn = await sdk.fullClient.dryRunTransactionBlock({
+      transactionBlock: await payload.build({ client: sdk.fullClient }),
+    })
+    // const transferTxn = await sdk.fullClient.sendTransaction(buildTestAccount(), payload)
+    // console.log('doCreatPool: ', transferTxn)
     console.log('🚀🚀🚀 ~ file: pool.test.ts:168 ~ test ~ transferTxn:', transferTxn)
   })
+
   test('converte tick index between i32 and u32', () => {
     const tickIndex = -1800
     const tickIndexUint32 = asUintN(BigInt(tickIndex))
@@ -194,5 +226,43 @@ describe('Pool Module', () => {
 
     const tickIndexI32 = asIntN(BigInt(tickIndexUint32))
     console.log('tickIndexI32', tickIndexI32)
+  })
+
+  test('creatPoolTransactionRowPayload', async () => {
+    const coinTypeA = '0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS'
+    const coinTypeB = '0xfa7ac3951fdca92c5200d468d31a365eb03b2be9936fde615e69f0c1274ad3a0::BLUB::BLUB'
+
+    const coinMetadataA = await sdk.fullClient.getCoinMetadata({ coinType: coinTypeA })
+    const coinMetadataB = await sdk.fullClient.getCoinMetadata({ coinType: coinTypeB })
+
+    const { transaction, position, coinAObject, coinBObject, coinAType, coinBType } = await sdk.Pool.createPoolTransactionRowPayload({
+      tick_spacing: 20,
+      initialize_sqrt_price: '31366801070720067977',
+      uri: '',
+      fix_amount_a: true,
+      amount_a: '100000000',
+      amount_b: '1000000000',
+      coinTypeA,
+      coinTypeB,
+      slippage: 0.005,
+      metadata_a: coinMetadataA!.id!,
+      metadata_b: coinMetadataB!.id!,
+      tick_lower: -440000,
+      tick_upper: 440000,
+    })
+    const cPrice = TickMath.sqrtPriceX64ToPrice(new BN('184467440737095516'), 0, 9)
+    console.log('🚀🚀🚀 ~ file: pool.test.ts:168 ~ test ~ cPrice:', cPrice.toString())
+    printTransaction(transaction)
+
+    TransactionUtil.buildTransferCoin(sdk, transaction, coinAObject, coinAType)
+    TransactionUtil.buildTransferCoin(sdk, transaction, coinBObject, coinBType)
+    transaction.transferObjects([position], sdk.senderAddress)
+    // const transferTxn = await sdk.fullClient.devInspectTransactionBlock({
+    //   transactionBlock: payload,
+    //   sender: buildTestAccount().getPublicKey().toSuiAddress(),
+    // })
+    const transferTxn = await sdk.fullClient.sendSimulationTransaction(transaction, keypair.getPublicKey().toSuiAddress())
+    console.log('doCreatPool: ', transferTxn)
+    console.log('🚀🚀🚀 ~ file: pool.test.ts:168 ~ test ~ transferTxn:', transferTxn)
   })
 })

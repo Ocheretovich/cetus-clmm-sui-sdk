@@ -22,7 +22,7 @@ const SDKConfig = {
 
 // mainnet
 export const clmmMainnet: SdkOptions = {
-  fullRpcUrl: getFullnodeUrl('mainnet'),
+  fullRpcUrl: 'https://sui-mainnet-endpoint.blockvision.org',
   simulationAccount: {
     address: '0x0000000000000000000000000000000000000000000000000000000000000000',
   },

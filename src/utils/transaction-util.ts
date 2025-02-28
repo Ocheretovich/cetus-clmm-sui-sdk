@@ -1,6 +1,6 @@
 import BN from 'bn.js'
 import Decimal from 'decimal.js'
-import { Transaction, TransactionObjectArgument } from '@mysten/sui/transactions'
+import { coinWithBalance, Transaction, TransactionObjectArgument, TransactionResult } from '@mysten/sui/transactions'
 import { CoinAssist } from '../math/CoinAssist'
 import { OnePath, SwapWithRouterParams } from '../modules/routerModule'
 import { TickData } from '../types/clmmpool'
@@ -73,8 +73,8 @@ function reverSlippageAmount(slippageAmount: number | string, slippage: number):
 }
 
 export async function printTransaction(tx: Transaction, isPrint = true) {
-  console.log(`inputs`, tx.blockData.inputs)
-  tx.blockData.transactions.forEach((item, index) => {
+  console.log(`inputs`, tx.getData().inputs)
+  tx.getData().commands.forEach((item, index) => {
     if (isPrint) {
       console.log(`transaction ${index}: `, item)
     }
@@ -884,6 +884,16 @@ export class TransactionUtil {
     }
 
     return TransactionUtil.buildCoin(tx, allCoins, coinAssets, amount, coinType, buildVector, fixAmount)
+  }
+
+  public static buildCoinWithBalance(amount: bigint, coinType: string): TransactionObjectArgument {
+    if (amount === BigInt(0)) {
+      if (CoinAssist.isSuiCoin(coinType)) {
+        return coinWithBalance({ balance: amount, useGasCoin: false })
+      }
+    }
+
+    return coinWithBalance({ balance: amount, type: coinType })
   }
 
   private static buildVectorCoin(

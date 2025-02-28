@@ -5,6 +5,9 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 import { getObjectPreviousTransactionDigest } from '../../src/utils/objects'
 import { SDK } from './init_mainnet_sdk'
 import { TestnetSDK } from './init_testnet_sdk'
+import dotenv from 'dotenv'
+
+const envConfig = dotenv.config()
 
 export const PositionObjectID = '0x7cea8359f50318d88026d702462df7ce9d96a5b12f3efe9dce6d6450fba779a0'
 export const PoolObjectID = '0xcf994611fd4c48e277ce3ffd4d4364c914af2c3cbb05f7bf6facd371de688630'
@@ -69,19 +72,9 @@ export async function buildTestPosition(sdk: CetusClmmSDK, posObjectId: string) 
 }
 
 export function buildTestAccount(): Ed25519Keypair {
-  const mnemonics = 'change prison cube paddle nice basic dirt drum upper army middle panic'
-  // const mnemonics =
-  //   'drum arch mouse dilemma voyage reason man prefer cook turn naive spin beyond pave horn setup banner friend among pledge charge describe popular machine'
-  const testAccountObject = Ed25519Keypair.deriveKeypair(mnemonics)
-  // console.log(' Address: ', testAccountObject.getPublicKey().toSuiAddress())
+  const testAccountObject = Ed25519Keypair.deriveKeypair(envConfig?.parsed?.SUI_WALLET_MNEMONICS || '')
+  console.log(' Address: ', testAccountObject.getPublicKey().toSuiAddress())
 
-  return testAccountObject
-}
-
-export function buildTestAccountNew(): Ed25519Keypair {
-  const mnemonics =
-    'crush eye huge happy buzz start flag skate birth casino invite can aim type shift rare surprise window script census actual jazz argue pattern'
-  const testAccountObject = Ed25519Keypair.deriveKeypair(mnemonics)
   return testAccountObject
 }
 
@@ -92,7 +85,7 @@ export enum TestnetCoin {
   AFR = '0x8ed60050f9c887864991b674cfc4b435be8e20e3e5a9970f7249794bd1319963::aifrens::AIFRENS',
   CETUS = '0x26b3bc67befc214058ca78ea9a2690298d731a2d4309485ec3d40198063c4abc::cetus::CETUS',
   SUI = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-  HASUI = "0xac2afb455cbcdc2ff1a2e9bbb8aa4ccb4506a544b08c740886892a5cdf92f472::hasui::HASUI",
+  HASUI = '0xac2afb455cbcdc2ff1a2e9bbb8aa4ccb4506a544b08c740886892a5cdf92f472::hasui::HASUI',
 }
 
 export enum MainnetCoin {

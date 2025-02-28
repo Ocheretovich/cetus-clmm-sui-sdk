@@ -15,7 +15,7 @@ import { Percentage } from '../src/math/percentage'
 import { adjustForCoinSlippage } from '../src/math/position'
 import 'isomorphic-fetch'
 import { printTransaction } from '../src/utils/transaction-util'
-import { Position } from '../src'
+import { fixCoinType, Position } from '../src'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 
 let sendKeypair: Ed25519Keypair
@@ -29,8 +29,16 @@ describe('Position add Liquidity Module', () => {
   })
 
   test('get ower position list', async () => {
-    const res = await sdk.Position.getPositionList("0xa40aead2dd007e5d16ce7282f2826c259c8fe5a0a5b163585787981f9edd2a72", [])
+    const res = await sdk.Position.getPositionList('0xa40aead2dd007e5d16ce7282f2826c259c8fe5a0a5b163585787981f9edd2a72', [])
     console.log('getPositionList####', res)
+  })
+
+  test('get position event list', async () => {
+    const res = await sdk.Position.getPositionTransactionList({
+      posId: '0x568e0062a77626312e18fde331750cd8743245877ec75562b1c5165ab87f4a8f',
+      originPosId: '0x0d5942433c0aecfe07e04772bbde765ed85b6e1c66e6156877c7382e23176906',
+    })
+    console.log('getPositionList####', res.data)
   })
 
   test('get pool position list', async () => {
@@ -54,6 +62,16 @@ describe('Position add Liquidity Module', () => {
     const pool = await sdk.Pool.getPool(PoolObjectID)
     const res = await sdk.Position.getPosition(pool.position_manager.positions_handle, PositionObjectID)
     console.log('getPositionInfo####', res)
+  })
+
+  test('calculateFee', async () => {
+    const res = await sdk.Position.calculateFee({
+      pool_id: '0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105',
+      pos_id: '0x66acd113c567a986bf2203a19c9771130d0f7206f641354614ef7ac2ea5ff1b1',
+      coinTypeA: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+      coinTypeB: '0x2::sui::SUI',
+    })
+    console.log('calculateFee####', res)
   })
 
   test('fetchPositionRewardList', async () => {
